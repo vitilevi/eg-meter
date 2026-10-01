@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Paleta — idêntica à do portfólio (victor-faria-portifolio/src/app/globals.css).
+
+   #FFF275 (amarelo) e #3A0CA3 (violeta) são espelhos de contraste: cada um é
+   legível em só uma polaridade de fundo, então os temas TROCAM os papéis em vez
+   de só clarear/escurecer.
+--------------------------------------------------------------------------- */
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #faf9f6;
+  --surface: #ffffff;
+  --surface-brand: #fff275;
+  --on-surface-brand: #12101c;
+  --text: #1a1625;
+  --text-muted: #4a4468;
+  --accent: #3a0ca3;
+  --on-accent: #ffffff;
+  --border: #dedad0;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0a0f;
+  --surface: #12101c;
+  --surface-brand: #3a0ca3;
+  --on-surface-brand: #ffffff;
+  --text: #edebf5;
+  --text-muted: #9d86d1;
+  --accent: #fff275;
+  --on-accent: #12101c;
+  --border: #2a2440;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-brand: var(--surface-brand);
+  --color-on-surface-brand: var(--on-surface-brand);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-border: var(--border);
+  /* Preenchimento de controles (estilo "fill" do iOS), derivado da paleta. */
+  --color-fill: color-mix(in srgb, var(--text-muted) 12%, transparent);
+
+  /* Fonte do sistema: SF Pro no iOS/macOS, Segoe no Windows, Roboto no Android. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui,
+    'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+/* Em @layer base para que utilitários do Tailwind (ex.: outline-none) vençam. */
+@layer base {
+  * {
+    min-width: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+    transition:
+      background-color 250ms ease-out,
+      color 250ms ease-out;
+  }
+
+  ::selection {
+    background-color: var(--accent);
+    color: var(--on-accent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

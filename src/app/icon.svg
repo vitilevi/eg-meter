@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="eg-meter"><title>eg-meter</title>
+  <rect width="512" height="512" rx="112" fill="#3a0ca3"/>
+  <path d="M256 104C256 104 148 228 148 318a108 108 0 0 0 216 0C364 228 256 104 256 104Z" fill="#fff275"/>
+  <path d="M152 300h208v18a104 104 0 0 1-208 0Z" fill="#3a0ca3" opacity=".18"/>
+  <rect x="192" y="292" width="128" height="16" rx="8" fill="#3a0ca3"/>
+</svg>
