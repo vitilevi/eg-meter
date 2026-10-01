@@ -17,6 +17,8 @@ export const EVENTS = {
 	clickGithub: "click_github",
 	clickPortfolio: "click_portfolio",
 	themeToggle: "theme_toggle",
+	installClick: "install_click",
+	installDismiss: "install_dismiss",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
