@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	ConsentBanner,
 	PrivacySettingsButton,
@@ -13,6 +13,12 @@ vi.mock("@/features/analytics/lib/firebase", () => ({
 }));
 
 describe("ConsentBanner", () => {
+	beforeEach(() => {
+		localStorage.clear();
+		// biome-ignore lint/suspicious/noDocumentCookie: limpa o cookie compartilhado entre testes
+		document.cookie = `${CONSENT_STORAGE_KEY}=; max-age=0; path=/`;
+	});
+
 	it("aparece na primeira visita e some ao aceitar", async () => {
 		const user = userEvent.setup();
 		render(<ConsentBanner />);
@@ -35,6 +41,15 @@ describe("ConsentBanner", () => {
 
 	it("não aparece se a escolha já foi feita", () => {
 		localStorage.setItem(CONSENT_STORAGE_KEY, "denied");
+		render(<ConsentBanner />);
+		expect(screen.queryByText("Podemos contar sua visita?")).not.toBeInTheDocument();
+	});
+
+	// O objetivo do cookie compartilhado: quem respondeu no portfólio não é
+	// perguntado de novo aqui.
+	it("não aparece se a escolha foi feita em outro site do domínio", () => {
+		// biome-ignore lint/suspicious/noDocumentCookie: simula o cookie gravado por victorfaria.dev
+		document.cookie = `${CONSENT_STORAGE_KEY}=granted; path=/`;
 		render(<ConsentBanner />);
 		expect(screen.queryByText("Podemos contar sua visita?")).not.toBeInTheDocument();
 	});

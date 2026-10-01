@@ -15,6 +15,7 @@ export const EVENTS = {
 	calculate: "calculate",
 	clickLinkedin: "click_linkedin",
 	clickGithub: "click_github",
+	clickPortfolio: "click_portfolio",
 	themeToggle: "theme_toggle",
 } as const;
 

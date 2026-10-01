@@ -7,5 +7,6 @@ export const SITE = {
 	links: {
 		linkedin: "https://www.linkedin.com/in/vitilevi/",
 		github: "https://github.com/vitilevi",
+		portfolio: "https://victorfaria.dev",
 	},
 } as const;

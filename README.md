@@ -38,7 +38,7 @@ pnpm verify        # typecheck + lint + testes
 - **Firebase Analytics**: o SDK só é baixado depois do aceite no banner. A escolha fica no
   `localStorage` (`egm-analytics-consent`) e pode ser revista em “Privacidade”, no rodapé.
 - Eventos: `fuel_select`, `blend_select`, `calculate` (após 1,5 s sem digitar), `click_linkedin`,
-  `click_github`, `theme_toggle`. No `next dev` nada é enviado: os eventos só aparecem no console.
+  `click_github`, `click_portfolio`, `theme_toggle`. No `next dev` nada é enviado: os eventos só aparecem no console.
 - A config web do Firebase fica em `src/features/analytics/lib/firebase.ts`. Ela é pública por natureza.
   Inclua `egmeter.victorfaria.dev` nos domínios autorizados do projeto Firebase.
 

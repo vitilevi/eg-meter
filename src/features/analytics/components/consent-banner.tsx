@@ -48,7 +48,8 @@ export function ConsentBanner() {
 				</h2>
 				<p className="text-text-muted mt-1.5 text-[15px] leading-snug">
 					Usamos o Google Analytics (Firebase) para medir, de forma anônima, quantas pessoas usam o
-					eg-meter. Você pode mudar de ideia quando quiser em “Privacidade”, no rodapé.
+					eg-meter. A escolha vale para todos os sites em victorfaria.dev, e você pode mudar de
+					ideia quando quiser em “Privacidade”, no rodapé.
 				</p>
 				<div className="mt-4 grid grid-cols-2 gap-3">
 					<button

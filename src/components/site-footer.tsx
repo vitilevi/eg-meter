@@ -42,6 +42,18 @@ export function SiteFooter() {
 				<span>Feito por {SITE.author}</span>
 				<PrivacySettingsButton className="hover:text-accent underline-offset-2 hover:underline" />
 			</div>
+
+			<a
+				href={SITE.links.portfolio}
+				target="_blank"
+				rel="noopener noreferrer"
+				onClick={() => track(EVENTS.clickPortfolio)}
+				className="text-text-muted hover:text-accent group self-center px-4 py-2 text-[13px] transition-colors"
+			>
+				Conheça meu portfólio{" "}
+				<span className="text-text group-hover:text-accent font-semibold">victorfaria.dev</span>{" "}
+				<span aria-hidden="true">↗</span>
+			</a>
 		</footer>
 	);
 }
