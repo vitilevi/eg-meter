@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { EVENTS, track } from "@/features/analytics";
 import {
 	type BlendResult,
@@ -10,24 +10,25 @@ import {
 	formatLiters,
 	formatPct,
 	getFuel,
-	PRESET_BLENDS,
 	parseLiters,
 } from "@/features/calculator/lib/blend";
 
-const CUSTOM = "custom";
-type BlendChoice = number | typeof CUSTOM;
+const DEFAULT_BLEND = 85;
 
 /** Espera o usuário parar de digitar antes de contar um cálculo. */
 const CALCULATE_EVENT_DELAY_MS = 1500;
 
+/** O slider dispara a cada passo; só conta quando a pessoa solta. */
+const BLEND_EVENT_DELAY_MS = 800;
+
 export function Calculator() {
 	const [fuelId, setFuelId] = useState<FuelId>("premium");
-	const [blendChoice, setBlendChoice] = useState<BlendChoice>(85);
-	const [customRaw, setCustomRaw] = useState("");
+	const [blendPct, setBlendPct] = useState(DEFAULT_BLEND);
 	const [litersRaw, setLitersRaw] = useState("");
 
 	const fuel = getFuel(fuelId);
-	const targetPct = blendChoice === CUSTOM ? Number.parseInt(customRaw, 10) : blendChoice;
+	// O slider começa no teor da gasolina: abaixo disso a mistura é impossível.
+	const targetPct = Math.max(blendPct, fuel.ethanolPct);
 	const liters = parseLiters(litersRaw);
 	const result = calculateBlend({ fuelEthanolPct: fuel.ethanolPct, targetPct, liters });
 
@@ -45,42 +46,35 @@ export function Calculator() {
 		return () => clearTimeout(timer);
 	}, [resultKey]);
 
+	const blendTouched = useRef(false);
+	useEffect(() => {
+		if (!blendTouched.current) return;
+		const timer = setTimeout(() => {
+			track(EVENTS.blendSelect, { blend: targetPct });
+		}, BLEND_EVENT_DELAY_MS);
+		return () => clearTimeout(timer);
+	}, [targetPct]);
+
 	function selectFuel(id: FuelId) {
 		setFuelId(id);
 		track(EVENTS.fuelSelect, { fuel: id });
 	}
 
-	function selectBlend(choice: BlendChoice) {
-		setBlendChoice(choice);
-		track(EVENTS.blendSelect, { blend: choice });
+	function selectBlend(pct: number) {
+		blendTouched.current = true;
+		setBlendPct(pct);
 	}
 
 	return (
-		<div className="flex flex-col gap-6">
-			<Section
-				title="Combustível"
-				footer={`Contém ${fuel.ethanolPct}% de etanol anidro na composição.`}
-			>
-				<FuelPicker value={fuelId} onChange={selectFuel} />
-				<EthanolBar pct={fuel.ethanolPct} />
-			</Section>
-
-			<Section
-				title="Mistura desejada"
-				footer="O número indica o percentual de etanol no tanque. E85 = 85% etanol + 15% gasolina."
-			>
-				<BlendPicker
-					value={blendChoice}
-					onChange={selectBlend}
-					customRaw={customRaw}
-					onCustomChange={setCustomRaw}
-					minPct={fuel.ethanolPct}
-				/>
-			</Section>
-
-			<Section title="Quanto vai abastecer">
-				<LitersField value={litersRaw} onChange={setLitersRaw} />
-			</Section>
+		<div className="flex flex-col gap-4">
+			{/* Um único grupo, no estilo das listas agrupadas do iOS. */}
+			<div className="bg-surface border-border divide-border divide-y rounded-2xl border">
+				<div className="p-2">
+					<FuelPicker value={fuelId} onChange={selectFuel} />
+				</div>
+				<BlendRow value={targetPct} min={fuel.ethanolPct} onChange={selectBlend} />
+				<LitersRow value={litersRaw} onChange={setLitersRaw} />
+			</div>
 
 			<Result
 				result={result}
@@ -88,37 +82,8 @@ export function Calculator() {
 				fuelEthanolPct={fuel.ethanolPct}
 				targetPct={targetPct}
 				hasLiters={litersRaw.trim() !== ""}
-				hasTarget={blendChoice !== CUSTOM || customRaw.trim() !== ""}
 			/>
 		</div>
-	);
-}
-
-function Section({
-	title,
-	footer,
-	children,
-}: {
-	title: string;
-	footer?: string;
-	children: React.ReactNode;
-}) {
-	const id = useId();
-	return (
-		<section aria-labelledby={id}>
-			<h2
-				id={id}
-				className="text-text-muted mb-2 px-4 text-[13px] font-medium tracking-wide uppercase"
-			>
-				{title}
-			</h2>
-			<div className="bg-surface border-border flex flex-col gap-4 rounded-2xl border p-4">
-				{children}
-			</div>
-			{footer ? (
-				<p className="text-text-muted mt-2 px-4 text-[13px] leading-snug">{footer}</p>
-			) : null}
-		</section>
 	);
 }
 
@@ -137,8 +102,11 @@ function FuelPicker({ value, onChange }: { value: FuelId; onChange: (id: FuelId)
 						onChange={() => onChange(fuel.id)}
 						className="peer sr-only"
 					/>
-					<span className="text-text-muted peer-checked:bg-surface peer-checked:text-text peer-focus-visible:outline-accent flex h-10 items-center justify-center rounded-[9px] text-[15px] font-medium transition-all peer-checked:shadow-[0_1px_4px_rgba(0,0,0,0.12)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2">
+					<span className="text-text-muted peer-checked:bg-surface peer-checked:text-text peer-focus-visible:outline-accent flex h-9 items-center justify-center gap-1.5 rounded-[9px] text-[15px] font-medium transition-all peer-checked:shadow-[0_1px_4px_rgba(0,0,0,0.12)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2">
 						{fuel.shortLabel}
+						<span className="text-text-muted text-[13px] font-normal tabular-nums">
+							{fuel.ethanolPct}% etanol
+						</span>
 					</span>
 				</label>
 			))}
@@ -146,111 +114,115 @@ function FuelPicker({ value, onChange }: { value: FuelId; onChange: (id: FuelId)
 	);
 }
 
-function EthanolBar({ pct }: { pct: number }) {
+function BlendRow({
+	value,
+	min,
+	onChange,
+}: {
+	value: number;
+	min: number;
+	onChange: (pct: number) => void;
+}) {
+	const id = useId();
+	const fillPct = ((value - min) / (100 - min)) * 100;
+
 	return (
-		<div>
-			<div className="text-text-muted mb-1.5 flex justify-between text-[13px]">
-				<span>
-					Etanol <strong className="text-text font-semibold">{pct}%</strong>
-				</span>
-				<span>
-					Gasolina <strong className="text-text font-semibold">{100 - pct}%</strong>
-				</span>
+		<div className="px-4 py-3">
+			<div className="flex items-baseline justify-between">
+				<label htmlFor={id} className="text-text text-[17px]">
+					Mistura
+				</label>
+				<output htmlFor={id} className="text-text text-[22px] font-bold tabular-nums">
+					E{value}
+				</output>
 			</div>
-			<div className="bg-fill flex h-2 overflow-hidden rounded-full" aria-hidden="true">
-				<div className="bg-accent transition-[width] duration-300" style={{ width: `${pct}%` }} />
+			<div className="mt-2 flex items-center gap-3">
+				<StepButton
+					label="Diminuir mistura"
+					disabled={value <= min}
+					onClick={() => onChange(value - 1)}
+				>
+					<path d="M5 12h14" />
+				</StepButton>
+				<input
+					id={id}
+					type="range"
+					min={min}
+					max={100}
+					step={1}
+					value={value}
+					aria-valuetext={`E${value}: ${value}% de etanol`}
+					onChange={(event) => onChange(Number(event.target.value))}
+					className="blend-range flex-1"
+					style={{ "--range-pct": `${fillPct}%` } as React.CSSProperties}
+				/>
+				<StepButton
+					label="Aumentar mistura"
+					disabled={value >= 100}
+					onClick={() => onChange(value + 1)}
+				>
+					<path d="M12 5v14M5 12h14" />
+				</StepButton>
 			</div>
 		</div>
 	);
 }
 
-function BlendPicker({
-	value,
-	onChange,
-	customRaw,
-	onCustomChange,
-	minPct,
+function StepButton({
+	label,
+	disabled,
+	onClick,
+	children,
 }: {
-	value: BlendChoice;
-	onChange: (choice: BlendChoice) => void;
-	customRaw: string;
-	onCustomChange: (raw: string) => void;
-	minPct: number;
+	label: string;
+	disabled: boolean;
+	onClick: () => void;
+	children: React.ReactNode;
 }) {
-	const name = useId();
-	const customId = useId();
-	const options: { value: BlendChoice; label: string }[] = [
-		...PRESET_BLENDS.map((pct) => ({ value: pct, label: `E${pct}` })),
-		{ value: CUSTOM, label: "Outro" },
-	];
-
 	return (
-		<>
-			<fieldset className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-				<legend className="sr-only">Mistura alvo</legend>
-				{options.map((option) => (
-					<label key={option.value} className="cursor-pointer">
-						<input
-							type="radio"
-							name={name}
-							value={option.value}
-							checked={value === option.value}
-							onChange={() => onChange(option.value)}
-							className="peer sr-only"
-						/>
-						<span className="bg-fill text-text peer-checked:bg-accent peer-checked:text-on-accent peer-focus-visible:outline-accent flex h-11 items-center justify-center rounded-xl text-[15px] font-semibold tabular-nums transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2">
-							{option.label}
-						</span>
-					</label>
-				))}
-			</fieldset>
-
-			{value === CUSTOM ? (
-				<div>
-					<label htmlFor={customId} className="text-text-muted mb-1.5 block text-[13px]">
-						Percentual de etanol ({minPct}% a 100%)
-					</label>
-					<div className="bg-fill focus-within:outline-accent flex h-12 items-center rounded-xl px-4 focus-within:outline-2">
-						<span className="text-text-muted text-[17px] font-semibold">E</span>
-						<input
-							id={customId}
-							type="text"
-							inputMode="numeric"
-							autoComplete="off"
-							maxLength={3}
-							placeholder="75"
-							value={customRaw}
-							onChange={(event) => onCustomChange(event.target.value.replace(/\D/g, ""))}
-							className="text-text placeholder:text-text-muted/60 w-full bg-transparent pl-0.5 text-[17px] font-semibold tabular-nums outline-none"
-						/>
-					</div>
-				</div>
-			) : null}
-		</>
+		<button
+			type="button"
+			aria-label={label}
+			disabled={disabled}
+			onClick={onClick}
+			className="bg-fill text-text grid h-8 w-8 shrink-0 place-items-center rounded-full transition-opacity active:opacity-60 disabled:opacity-30"
+		>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="2.4"
+				strokeLinecap="round"
+				aria-hidden="true"
+			>
+				{children}
+			</svg>
+		</button>
 	);
 }
 
-function LitersField({ value, onChange }: { value: string; onChange: (raw: string) => void }) {
+function LitersRow({ value, onChange }: { value: string; onChange: (raw: string) => void }) {
 	const id = useId();
 	return (
-		<div>
-			<label htmlFor={id} className="text-text-muted mb-1.5 block text-[13px]">
-				Total de litros que vão entrar no tanque
+		<div className="flex h-14 items-center gap-3 px-4">
+			<label htmlFor={id} className="text-text shrink-0 text-[17px]">
+				Litros
 			</label>
-			<div className="bg-fill focus-within:outline-accent flex h-14 items-center rounded-xl px-4 focus-within:outline-2">
-				<input
-					id={id}
-					type="text"
-					inputMode="numeric"
-					autoComplete="off"
-					maxLength={4}
-					placeholder="50"
-					value={value}
-					onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
-					className="text-text placeholder:text-text-muted/60 w-full bg-transparent text-[28px] font-semibold tabular-nums outline-none"
-				/>
-				<span className="text-text-muted text-[20px] font-semibold">L</span>
-			</div>
+			<input
+				id={id}
+				type="text"
+				inputMode="numeric"
+				autoComplete="off"
+				maxLength={4}
+				placeholder="50"
+				aria-label="Total de litros que vão entrar no tanque"
+				value={value}
+				onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
+				className="text-text placeholder:text-text-muted/50 w-full bg-transparent text-right text-[22px] font-bold tabular-nums outline-none"
+			/>
+			<span className="text-text-muted text-[17px] font-semibold">L</span>
 		</div>
 	);
 }
@@ -261,108 +233,58 @@ function Result({
 	fuelEthanolPct,
 	targetPct,
 	hasLiters,
-	hasTarget,
 }: {
 	result: BlendResult;
 	fuelLabel: string;
 	fuelEthanolPct: number;
 	targetPct: number;
 	hasLiters: boolean;
-	hasTarget: boolean;
 }) {
 	let content: React.ReactNode;
 
 	if (result.ok) {
-		const gasolinePct = (result.gasolineLiters / result.totalLiters) * 100;
-		const ethanolFromGasoline =
-			Math.round((result.totalEthanolLiters - result.ethanolLiters) * 10) / 10;
 		const drifted = result.actualPct !== targetPct;
 		content = (
 			<>
-				<p className="text-[13px] font-medium tracking-wide uppercase opacity-80">
-					Para chegar em E{targetPct}
-				</p>
-				<dl className="mt-3 grid grid-cols-2 gap-4">
+				<dl className="grid grid-cols-2 gap-4">
 					<div>
 						<dt className="text-[15px] opacity-80">{fuelLabel}</dt>
-						<dd className="mt-0.5 text-[34px] leading-tight font-bold tabular-nums">
+						<dd className="text-[34px] leading-tight font-bold tabular-nums">
 							{formatLiters(result.gasolineLiters)}
 						</dd>
 					</div>
 					<div>
 						<dt className="text-[15px] opacity-80">Etanol</dt>
-						<dd className="mt-0.5 text-[34px] leading-tight font-bold tabular-nums">
+						<dd className="text-[34px] leading-tight font-bold tabular-nums">
 							{formatLiters(result.ethanolLiters)}
 						</dd>
 					</div>
 				</dl>
-				<div
-					className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-current/15"
-					aria-hidden="true"
-				>
-					<div
-						className="bg-current/45 transition-[width] duration-300"
-						style={{ width: `${gasolinePct}%` }}
-					/>
-					<div className="flex-1 bg-current" />
-				</div>
-				<p className="mt-3 text-[13px] leading-snug opacity-80">
-					Total de {formatLiters(result.totalLiters)}, com {formatLiters(result.totalEthanolLiters)}{" "}
-					de etanol no tanque
-					{ethanolFromGasoline > 0
-						? ` — ${formatLiters(ethanolFromGasoline)} já vêm na gasolina (${fuelEthanolPct}%).`
-						: "."}
-					{drifted ? ` Com litros inteiros a mistura fica em E${formatPct(result.actualPct)}.` : ""}
+				<p className="mt-2 text-[13px] opacity-80">
+					Total {formatLiters(result.totalLiters)} · E{targetPct}
+					{drifted ? ` (mistura real E${formatPct(result.actualPct)})` : ""}
 				</p>
 			</>
 		);
-	} else if (result.reason === "target-below-fuel" && hasTarget) {
-		content = (
-			<Message
-				title={`E${targetPct} não é possível com essa gasolina`}
-				body={`${fuelLabel} já tem ${fuelEthanolPct}% de etanol. Escolha uma mistura a partir de E${fuelEthanolPct}.`}
-			/>
-		);
-	} else if (result.reason === "invalid-target" && hasTarget) {
-		content = (
-			<Message title="Mistura inválida" body={`Use um valor entre E${fuelEthanolPct} e E100.`} />
-		);
-	} else if (result.reason === "invalid-liters" && hasLiters) {
-		content = (
-			<Message title="Quantidade inválida" body="Informe os litros em números inteiros, ex.: 45." />
-		);
-	} else if (!hasTarget) {
-		content = (
-			<Message
-				title="Qual mistura?"
-				body="Digite o percentual de etanol que você quer no tanque."
-			/>
-		);
+	} else if (result.reason === "target-below-fuel" || result.reason === "invalid-target") {
+		content = <Message text={`Escolha uma mistura entre E${fuelEthanolPct} e E100.`} />;
+	} else if (hasLiters) {
+		content = <Message text="Informe os litros em números inteiros, ex.: 45." />;
 	} else {
-		content = (
-			<Message
-				title="Quanto de cada um?"
-				body="Informe quantos litros vão entrar no tanque para ver a conta."
-			/>
-		);
+		content = <Message text="Informe os litros para ver quanto colocar de cada um." />;
 	}
 
 	return (
 		<section
 			aria-live="polite"
 			aria-label="Resultado"
-			className="bg-surface-brand text-on-surface-brand rounded-3xl p-5"
+			className="bg-surface-brand text-on-surface-brand rounded-2xl p-5"
 		>
 			{content}
 		</section>
 	);
 }
 
-function Message({ title, body }: { title: string; body: string }) {
-	return (
-		<>
-			<p className="text-[17px] font-semibold">{title}</p>
-			<p className="mt-1 text-[15px] leading-snug opacity-80">{body}</p>
-		</>
-	);
+function Message({ text }: { text: string }) {
+	return <p className="text-[15px] leading-snug font-medium">{text}</p>;
 }
